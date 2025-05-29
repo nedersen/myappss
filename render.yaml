@@ -2,8 +2,8 @@ services:
   - type: web
     name: fanla-backend
     env: docker
-    buildCommand: ./mvnw clean package -DskipTests
-    startCommand: java -jar target/*.jar
+    buildCommand: docker build -t fanla-backend .
+    startCommand: docker run -p 8080:8080 fanla-backend
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
