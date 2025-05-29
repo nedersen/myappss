@@ -1,0 +1,38 @@
+internetarchive:
+  access-key: ${IA_ACCESS_KEY:QurjfzISaOSms9B0}
+  secret-key: ${IA_SECRET_KEY:LEK7kHaYWNeblkK0}
+
+# JWT Configuration
+app:
+  jwt:
+    secret: ${JWT_SECRET:5A7234753778214125442A472D4B6150645367566B58703273357638792F423F}
+    expiration-ms: 86400000 # 24 hours
+    refresh-expiration-ms: 604800000 # 7 days
+
+spring:
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 20
+          order_inserts: true
+          order_updates: true
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  datasource:
+    # Railway PostgreSQL bağlantı ayarları - dış ağ bağlantısı (yerel geliştirme için)
+    url: jdbc:postgresql://centerbeam.proxy.rlwy.net:12585/railway?sslmode=require
+    username: postgres
+    password: RYOGUNLyDUmEwYtrMMCOaRPnYPfGWxOL
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 20000
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 100MB
