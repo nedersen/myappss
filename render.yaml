@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: fanla-backend
+    env: docker
+    buildCommand: ./mvnw clean package -DskipTests
+    startCommand: java -jar target/*.jar
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://postgres.railway.internal:5432/railway
+      - key: SPRING_DATASOURCE_USERNAME
+        value: postgres
+      - key: SPRING_DATASOURCE_PASSWORD
+        value: RYOGUNLyDUmEwYtrMMCOaRPnYPfGWxOL
+      - key: IA_ACCESS_KEY
+        value: QurjfzISaOSms9B0
+      - key: IA_SECRET_KEY
+        value: LEK7kHaYWNeblkK0
+      - key: JWT_SECRET
+        value: 5A7234753778214125442A472D4B6150645367566B58703273357638792F423F

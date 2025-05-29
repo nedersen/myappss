@@ -1,0 +1,12 @@
+{
+  "name": "fanla-backend",
+  "version": "1.0.0",
+  "description": "Fanla Backend Application",
+  "scripts": {
+    "start": "java -jar target/*.jar",
+    "build": "./mvnw clean package -DskipTests"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
