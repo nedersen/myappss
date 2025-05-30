@@ -354,6 +354,12 @@ public class AdminMatchDetailController {
                 return ResponseEntity.ok(new MessageResponse("Sound is already playing"));
             }
             
+            // First, stop any existing timers for this match if there's an active sound
+            if (match.getActiveSound() != null) {
+                logger.info("Stopping existing sound {} before starting new sound {}", match.getActiveSound().getId(), soundId);
+                soundTimerService.stopTimer(match.getTeam().getId(), match.getActiveSound().getId());
+            }
+            
             // Maçı yeni ses ile güncelle (sadece RAM'de)
             match.setActiveSound(sound);
             match.setSoundStatus(SoundStatus.STARTED);
@@ -363,8 +369,9 @@ public class AdminMatchDetailController {
             // Önbellekteki maçı güncelle
             matchCache.put(matchId, match);
             
-            // RAM durumunu güncelle
+            // RAM durumunu güncelle - explicitly set position to 0
             matchSoundStateManager.startSound(matchId, soundId, sound.getTitle(), sound.getSoundUrl(), sound.getSoundImageUrl());
+            matchSoundStateManager.updatePosition(matchId, 0L);
             
             // Ses zamanlayıcısını başlat
             soundTimerService.startTimer(match.getTeam().getId(), sound.getId(), 0L);
@@ -405,8 +412,10 @@ public class AdminMatchDetailController {
                 "soundImageUrl", sound.getSoundImageUrl()
             ));
             response.put("soundStatus", SoundStatus.STARTED);
-            response.put("currentMillisecond", 0L);
+            response.put("currentMillisecond", 0L); // Always return 0 for start
             response.put("soundUpdatedAt", match.getSoundUpdatedAt());
+            
+            logger.info("Started sound {} for match {} at position 0", soundId, matchId);
             
             return ResponseEntity.ok(response);
             
@@ -457,11 +466,13 @@ public class AdminMatchDetailController {
                 soundTimerService.stopTimer(match.getTeam().getId(), match.getActiveSound().getId());
             }
             
-            // RAM durumunu güncelle
+            // RAM durumunu güncelle ve pozisyonu sıfırla
             matchSoundStateManager.stopSound(matchId);
+            matchSoundStateManager.updatePosition(matchId, 0L);
             
             // Maçı güncelle (sadece RAM'de)
             match.setSoundStatus(SoundStatus.STOPPED);
+            match.setCurrentMillisecond(0L); // Explicitly reset to 0
             match.setSoundUpdatedAt(new Date());
             
             // Önbellekteki maçı güncelle
@@ -484,8 +495,10 @@ public class AdminMatchDetailController {
                 response.put("activeSound", null);
             }
             response.put("soundStatus", match.getSoundStatus());
-            response.put("currentMillisecond", match.getCurrentMillisecond());
+            response.put("currentMillisecond", 0L); // Always return 0 for stop
             response.put("soundUpdatedAt", match.getSoundUpdatedAt());
+            
+            logger.info("Stopped sound for match {} and reset position to 0", matchId);
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
