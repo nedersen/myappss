@@ -23,10 +23,13 @@ spring:
       ddl-auto: update
     show-sql: true
   datasource:
-    # Railway PostgreSQL bağlantı ayarları - dış ağ bağlantısı (yerel geliştirme için)
-    url: jdbc:postgresql://centerbeam.proxy.rlwy.net:12585/railway?sslmode=require
+    # Railway PostgreSQL bağlantı ayarları
+    # Dış ağ bağlantısı (yerel geliştirme için)
+    url: jdbc:postgresql://yamanote.proxy.rlwy.net:13532/railway?sslmode=require
+    # İç ağ bağlantısı (Railway içinde çalışırken)
+    # url: jdbc:postgresql://postgres.railway.internal:5432/railway
     username: postgres
-    password: RYOGUNLyDUmEwYtrMMCOaRPnYPfGWxOL
+    password: BtLiPvOpEZtLNlTGJDspHabXohKDKhPw
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 5

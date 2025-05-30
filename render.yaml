@@ -12,7 +12,7 @@ services:
       - key: SPRING_DATASOURCE_USERNAME
         value: postgres
       - key: SPRING_DATASOURCE_PASSWORD
-        value: RYOGUNLyDUmEwYtrMMCOaRPnYPfGWxOL
+        value: BtLiPvOpEZtLNlTGJDspHabXohKDKhPw
       - key: IA_ACCESS_KEY
         value: QurjfzISaOSms9B0
       - key: IA_SECRET_KEY
