@@ -12,8 +12,6 @@ import com.project.fanla.repository.SoundRepository;
 import com.project.fanla.repository.TeamRepository;
 import com.project.fanla.repository.UserRepository;
 import com.project.fanla.service.InternetArchiveService;
-import com.project.fanla.service.SoundCacheService;
-import com.project.fanla.service.SoundEventPublisher;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -37,24 +35,21 @@ public class SoundController {
 
     @Autowired
     private SoundRepository soundRepository;
-    
+
     @Autowired
     private TeamRepository teamRepository;
-    
+
     @Autowired
     private UserRepository userRepository;
-    
+
     @Autowired
     private InternetArchiveService internetArchiveService;
-    
+
     @Autowired
     private MatchSoundDetailRepository matchSoundDetailRepository;
-    
+
     @Autowired
-    private SoundEventPublisher soundEventPublisher;
-    
-    @Autowired
-    private SoundCacheService soundCacheService;
+    private AdminMatchDetailController adminMatchDetailController;
 
     // Get all sounds for admin's team
     @GetMapping
@@ -64,17 +59,17 @@ public class SoundController {
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
-        
+
         List<SoundResponse> sounds = soundRepository.findByTeam(team).stream()
                 .map(SoundResponse::new)
                 .collect(Collectors.toList());
-        
+
         return ResponseEntity.ok(sounds);
     }
 
@@ -86,13 +81,13 @@ public class SoundController {
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
-        
+
         return soundRepository.findById(id)
                 .map(sound -> {
                     // Check if sound belongs to admin's team
@@ -112,29 +107,29 @@ public class SoundController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "imageFile", required = false) MultipartFile imageFile,
             @RequestParam(value = "status", required = false) SoundStatus status) {
-        
+
         // Get the currently authenticated user
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
-        
+
         try {
             // Upload sound file to Internet Archive
             String soundUrl = internetArchiveService.uploadFile(file);
-            
+
             // Upload image file to Internet Archive if provided
             String imageUrl = null;
             if (imageFile != null && !imageFile.isEmpty()) {
                 imageUrl = internetArchiveService.uploadFile(imageFile);
             }
-            
+
             // Create new sound with the uploaded file URLs
             Sound sound = new Sound();
             sound.setTitle(title);
@@ -143,18 +138,18 @@ public class SoundController {
             sound.setTeam(team);
             sound.setStatus(status != null ? status : SoundStatus.STOPPED);
             sound.setCurrentMillisecond(0L);
-            
+
             Sound savedSound = soundRepository.save(sound);
-            
-            // Ses oluşturuldu olayını yayınla
-            soundEventPublisher.publishSoundCreated(savedSound);
-            
+
+            // Yeni sesi önbelleğe ekle
+            adminMatchDetailController.addSoundToCache(savedSound);
+
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(new SoundResponse(savedSound));
-            
+
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error uploading file: " + e.getMessage());
+                    .body("Error uploading files: " + e.getMessage());
         }
     }
 
@@ -166,27 +161,27 @@ public class SoundController {
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
 
-        // Create new sound
+        // Create new sound with the provided URLs
         Sound sound = new Sound();
         sound.setTitle(soundRequest.getTitle());
         sound.setSoundUrl(soundRequest.getSoundUrl());
         sound.setSoundImageUrl(soundRequest.getSoundImageUrl());
         sound.setTeam(team);
-        sound.setStatus(soundRequest.getStatus() != null ? soundRequest.getStatus() : SoundStatus.STOPPED);
-        sound.setCurrentMillisecond(soundRequest.getCurrentMillisecond() != null ? soundRequest.getCurrentMillisecond() : 0L);
+        sound.setStatus(soundRequest.getStatus());
+        sound.setCurrentMillisecond(soundRequest.getCurrentMillisecond());
 
         Sound savedSound = soundRepository.save(sound);
-        
-        // Ses oluşturuldu olayını yayınla
-        soundEventPublisher.publishSoundCreated(savedSound);
-        
+
+        // Yeni sesi önbelleğe ekle
+        adminMatchDetailController.addSoundToCache(savedSound);
+
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(new SoundResponse(savedSound));
@@ -197,19 +192,19 @@ public class SoundController {
     public ResponseEntity<?> uploadSoundImage(
             @PathVariable Long id,
             @RequestParam("imageFile") MultipartFile imageFile) {
-        
+
         // Get the currently authenticated user
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
-        
+
         return soundRepository.findById(id)
                 .map(sound -> {
                     // Check if sound belongs to admin's team
@@ -217,18 +212,18 @@ public class SoundController {
                         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                                 .body("Error: You don't have permission to update this sound.");
                     }
-                    
+
                     try {
                         // Upload image file to Internet Archive
                         String imageUrl = internetArchiveService.uploadFile(imageFile);
-                        
+
                         // Update sound with the image URL
                         sound.setSoundImageUrl(imageUrl);
                         Sound updatedSound = soundRepository.save(sound);
-                        
-                        // Ses güncellendi olayını yayınla
-                        soundEventPublisher.publishSoundUpdated(updatedSound);
-                        
+
+                        // Güncellenen sesi önbellekte güncelle
+                        adminMatchDetailController.updateSoundInCache(updatedSound);
+
                         return ResponseEntity.ok(new SoundResponse(updatedSound));
                     } catch (IOException e) {
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -246,13 +241,13 @@ public class SoundController {
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
-        
+
         return soundRepository.findById(id)
                 .map(sound -> {
                     // Check if sound belongs to admin's team
@@ -260,7 +255,7 @@ public class SoundController {
                         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                                 .body("Error: You don't have permission to update this sound.");
                     }
-                    
+
                     sound.setTitle(soundRequest.getTitle());
                     if (soundRequest.getSoundUrl() != null) {
                         sound.setSoundUrl(soundRequest.getSoundUrl());
@@ -270,12 +265,12 @@ public class SoundController {
                     }
                     sound.setStatus(soundRequest.getStatus());
                     sound.setCurrentMillisecond(soundRequest.getCurrentMillisecond());
-                    
+
                     Sound updatedSound = soundRepository.save(sound);
-                    
-                    // Ses güncellendi olayını yayınla
-                    soundEventPublisher.publishSoundUpdated(updatedSound);
-                    
+
+                    // Güncellenen sesi önbellekte güncelle
+                    adminMatchDetailController.updateSoundInCache(updatedSound);
+
                     return ResponseEntity.ok(new SoundResponse(updatedSound));
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -289,13 +284,13 @@ public class SoundController {
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
-        
+
         return soundRepository.findById(id)
                 .map(sound -> {
                     // Check if sound belongs to admin's team
@@ -303,28 +298,22 @@ public class SoundController {
                         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                                 .body("Error: You don't have permission to delete this sound.");
                     }
-                    
+
                     try {
                         // First, find all MatchSoundDetail entities that reference this sound
                         List<MatchSoundDetail> matchSoundDetails = matchSoundDetailRepository.findByActiveSound(sound);
-                        
+
                         // Remove the references by setting activeSound to null
                         for (MatchSoundDetail detail : matchSoundDetails) {
                             detail.setActiveSound(null);
                             matchSoundDetailRepository.save(detail);
                         }
-                        
-                        // Ses silinmeden önce kopyasını al
-                        Sound soundToDelete = new Sound();
-                        soundToDelete.setId(sound.getId());
-                        soundToDelete.setTeam(sound.getTeam());
-                        
-                        // Delete sound
+
+                        // Sesi önbellekten kaldır
+                        adminMatchDetailController.removeSoundFromCache(sound);
+
+                        // Now it's safe to delete the sound
                         soundRepository.delete(sound);
-                        
-                        // Ses silindi olayını yayınla
-                        soundEventPublisher.publishSoundDeleted(soundToDelete);
-                        
                         return ResponseEntity.ok().body("Sound deleted successfully");
                     } catch (DataIntegrityViolationException e) {
                         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -345,20 +334,20 @@ public class SoundController {
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
-        
+
         List<SoundResponse> sounds = soundRepository.findByTeamAndTitleContainingIgnoreCase(team, title).stream()
                 .map(SoundResponse::new)
                 .collect(Collectors.toList());
-        
+
         return ResponseEntity.ok(sounds);
     }
-    
+
     // Update sound status
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateSoundStatus(@PathVariable Long id, @RequestParam SoundStatus status) {
@@ -367,13 +356,13 @@ public class SoundController {
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
-        
+
         return soundRepository.findById(id)
                 .map(sound -> {
                     // Check if sound belongs to admin's team
@@ -381,18 +370,18 @@ public class SoundController {
                         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                                 .body("Error: You don't have permission to update this sound.");
                     }
-                    
+
                     sound.setStatus(status);
                     Sound updatedSound = soundRepository.save(sound);
-                    
-                    // Ses güncellendi olayını yayınla
-                    soundEventPublisher.publishSoundUpdated(updatedSound);
-                    
+
+                    // Güncellenen sesi önbellekte güncelle
+                    adminMatchDetailController.updateSoundInCache(updatedSound);
+
                     return ResponseEntity.ok(new SoundResponse(updatedSound));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
-    
+
     // Update sound current millisecond
     @PutMapping("/{id}/position")
     public ResponseEntity<?> updateSoundPosition(@PathVariable Long id, @RequestParam Long millisecond) {
@@ -401,13 +390,13 @@ public class SoundController {
         String currentUsername = authentication.getName();
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
-        
+
         // Get admin's team
         Team team = currentUser.getTeam();
         if (team == null) {
             return ResponseEntity.badRequest().body("Error: Admin is not assigned to any team.");
         }
-        
+
         return soundRepository.findById(id)
                 .map(sound -> {
                     // Check if sound belongs to admin's team
@@ -415,13 +404,13 @@ public class SoundController {
                         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                                 .body("Error: You don't have permission to update this sound.");
                     }
-                    
+
                     sound.setCurrentMillisecond(millisecond);
                     Sound updatedSound = soundRepository.save(sound);
-                    
-                    // Ses güncellendi olayını yayınla
-                    soundEventPublisher.publishSoundUpdated(updatedSound);
-                    
+
+                    // Güncellenen sesi önbellekte güncelle
+                    adminMatchDetailController.updateSoundInCache(updatedSound);
+
                     return ResponseEntity.ok(new SoundResponse(updatedSound));
                 })
                 .orElse(ResponseEntity.notFound().build());

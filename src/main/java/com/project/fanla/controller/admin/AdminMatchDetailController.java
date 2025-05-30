@@ -91,6 +91,71 @@ public class AdminMatchDetailController {
     }
     
     /**
+     * Yeni bir sesi önbelleğe ekler
+     * 
+     * @param sound Önbelleğe eklenecek ses
+     */
+    public void addSoundToCache(Sound sound) {
+        logger.info("Adding sound {} to cache", sound.getId());
+        soundCache.put(sound.getId(), sound);
+        
+        // Takım seslerini grupla
+        Long teamId = sound.getTeam().getId();
+        teamSoundsCache.computeIfAbsent(teamId, k -> new java.util.ArrayList<>()).add(sound);
+        
+        logger.info("Sound added to cache, total sounds: {}", soundCache.size());
+    }
+    
+    /**
+     * Bir sesi önbellekten günceller
+     * 
+     * @param sound Güncellenecek ses
+     */
+    public void updateSoundInCache(Sound sound) {
+        logger.info("Updating sound {} in cache", sound.getId());
+        
+        // Önce eski sesi önbellekten kaldır
+        Sound oldSound = soundCache.get(sound.getId());
+        if (oldSound != null) {
+            Long teamId = oldSound.getTeam().getId();
+            List<Sound> teamSounds = teamSoundsCache.get(teamId);
+            if (teamSounds != null) {
+                teamSounds.removeIf(s -> s.getId().equals(sound.getId()));
+            }
+        }
+        
+        // Yeni sesi önbelleğe ekle
+        soundCache.put(sound.getId(), sound);
+        
+        // Takım seslerini güncelle
+        Long teamId = sound.getTeam().getId();
+        teamSoundsCache.computeIfAbsent(teamId, k -> new java.util.ArrayList<>()).add(sound);
+        
+        logger.info("Sound updated in cache");
+    }
+    
+    /**
+     * Bir sesi önbellekten siler
+     * 
+     * @param sound Silinecek ses
+     */
+    public void removeSoundFromCache(Sound sound) {
+        logger.info("Removing sound {} from cache", sound.getId());
+        
+        // Önbellekten sesi kaldır
+        soundCache.remove(sound.getId());
+        
+        // Takım seslerinden kaldır
+        Long teamId = sound.getTeam().getId();
+        List<Sound> teamSounds = teamSoundsCache.get(teamId);
+        if (teamSounds != null) {
+            teamSounds.removeIf(s -> s.getId().equals(sound.getId()));
+        }
+        
+        logger.info("Sound removed from cache, total sounds: {}", soundCache.size());
+    }
+    
+    /**
      * Kullanıcının takımını önbellekten veya veritabanından alır
      * 
      * @return Kullanıcının takımı
