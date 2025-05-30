@@ -12,6 +12,8 @@ import com.project.fanla.repository.SoundRepository;
 import com.project.fanla.repository.TeamRepository;
 import com.project.fanla.repository.UserRepository;
 import com.project.fanla.service.InternetArchiveService;
+import com.project.fanla.service.SoundCacheService;
+import com.project.fanla.service.SoundEventPublisher;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -47,6 +49,12 @@ public class SoundController {
     
     @Autowired
     private MatchSoundDetailRepository matchSoundDetailRepository;
+    
+    @Autowired
+    private SoundEventPublisher soundEventPublisher;
+    
+    @Autowired
+    private SoundCacheService soundCacheService;
 
     // Get all sounds for admin's team
     @GetMapping
@@ -138,6 +146,9 @@ public class SoundController {
             
             Sound savedSound = soundRepository.save(sound);
             
+            // Ses oluşturuldu olayını yayınla
+            soundEventPublisher.publishSoundCreated(savedSound);
+            
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(new SoundResponse(savedSound));
             
@@ -172,6 +183,9 @@ public class SoundController {
         sound.setCurrentMillisecond(soundRequest.getCurrentMillisecond() != null ? soundRequest.getCurrentMillisecond() : 0L);
 
         Sound savedSound = soundRepository.save(sound);
+        
+        // Ses oluşturuldu olayını yayınla
+        soundEventPublisher.publishSoundCreated(savedSound);
         
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -211,6 +225,9 @@ public class SoundController {
                         // Update sound with the image URL
                         sound.setSoundImageUrl(imageUrl);
                         Sound updatedSound = soundRepository.save(sound);
+                        
+                        // Ses güncellendi olayını yayınla
+                        soundEventPublisher.publishSoundUpdated(updatedSound);
                         
                         return ResponseEntity.ok(new SoundResponse(updatedSound));
                     } catch (IOException e) {
@@ -255,6 +272,10 @@ public class SoundController {
                     sound.setCurrentMillisecond(soundRequest.getCurrentMillisecond());
                     
                     Sound updatedSound = soundRepository.save(sound);
+                    
+                    // Ses güncellendi olayını yayınla
+                    soundEventPublisher.publishSoundUpdated(updatedSound);
+                    
                     return ResponseEntity.ok(new SoundResponse(updatedSound));
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -293,8 +314,17 @@ public class SoundController {
                             matchSoundDetailRepository.save(detail);
                         }
                         
-                        // Now it's safe to delete the sound
+                        // Ses silinmeden önce kopyasını al
+                        Sound soundToDelete = new Sound();
+                        soundToDelete.setId(sound.getId());
+                        soundToDelete.setTeam(sound.getTeam());
+                        
+                        // Delete sound
                         soundRepository.delete(sound);
+                        
+                        // Ses silindi olayını yayınla
+                        soundEventPublisher.publishSoundDeleted(soundToDelete);
+                        
                         return ResponseEntity.ok().body("Sound deleted successfully");
                     } catch (DataIntegrityViolationException e) {
                         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -354,6 +384,10 @@ public class SoundController {
                     
                     sound.setStatus(status);
                     Sound updatedSound = soundRepository.save(sound);
+                    
+                    // Ses güncellendi olayını yayınla
+                    soundEventPublisher.publishSoundUpdated(updatedSound);
+                    
                     return ResponseEntity.ok(new SoundResponse(updatedSound));
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -384,6 +418,10 @@ public class SoundController {
                     
                     sound.setCurrentMillisecond(millisecond);
                     Sound updatedSound = soundRepository.save(sound);
+                    
+                    // Ses güncellendi olayını yayınla
+                    soundEventPublisher.publishSoundUpdated(updatedSound);
+                    
                     return ResponseEntity.ok(new SoundResponse(updatedSound));
                 })
                 .orElse(ResponseEntity.notFound().build());
