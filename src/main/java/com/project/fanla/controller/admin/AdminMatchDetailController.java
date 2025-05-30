@@ -264,7 +264,14 @@ public class AdminMatchDetailController {
             // Get sound information from RAM
             MatchSoundStateManager.MatchSoundState state = matchSoundStateManager.getState(matchId);
             
-            // If state exists in RAM, use it
+            // If state doesn't exist in RAM, initialize it first
+            if (state == null && match.getActiveSound() != null) {
+                logger.info("No in-memory state found for match {}, initializing from match data", matchId);
+                matchSoundStateManager.updateState(matchId, match);
+                state = matchSoundStateManager.getState(matchId);
+            }
+            
+            // Now use the in-memory state (which should exist now if there's an active sound)
             if (state != null) {
                 if (state.getActiveSoundId() != null) {
                     response.put("activeSound", Map.of(
@@ -279,21 +286,11 @@ public class AdminMatchDetailController {
                 response.put("soundStatus", state.getSoundStatus());
                 response.put("currentMillisecond", state.getCurrentMillisecond());
                 response.put("soundUpdatedAt", state.getUpdatedAt());
-            } 
-            // Otherwise, use the database values and initialize RAM state
-            else if (match.getActiveSound() != null) {
-                matchSoundStateManager.updateState(matchId, match);
                 
-                response.put("activeSound", Map.of(
-                    "id", match.getActiveSound().getId(),
-                    "title", match.getActiveSound().getTitle(),
-                    "soundUrl", match.getActiveSound().getSoundUrl(),
-                    "soundImageUrl", match.getActiveSound().getSoundImageUrl()
-                ));
-                response.put("soundStatus", match.getSoundStatus());
-                response.put("currentMillisecond", match.getCurrentMillisecond());
-                response.put("soundUpdatedAt", match.getSoundUpdatedAt());
+                logger.info("Using in-memory state for match {}: soundId={}, status={}, position={}", 
+                        matchId, state.getActiveSoundId(), state.getSoundStatus(), state.getCurrentMillisecond());
             } else {
+                // No state in RAM and no active sound in the match
                 response.put("activeSound", null);
                 response.put("soundStatus", SoundStatus.STOPPED);
                 response.put("currentMillisecond", 0);
