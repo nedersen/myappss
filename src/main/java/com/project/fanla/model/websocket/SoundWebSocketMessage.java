@@ -13,6 +13,7 @@ public class SoundWebSocketMessage {
     private String soundImageUrl;
     private SoundStatus status;
     private Long currentMillisecond;
+    private Long startAtEpochMillis; // Added for precise audio synchronization
     private Date updatedAt;
     private List<LyricsDto> lyrics;
 
@@ -28,6 +29,7 @@ public class SoundWebSocketMessage {
         this.soundImageUrl = soundImageUrl;
         this.status = status;
         this.currentMillisecond = currentMillisecond;
+        this.startAtEpochMillis = System.currentTimeMillis() + 500; // Add 500ms buffer for network latency
         this.updatedAt = new Date();
         this.lyrics = null;
     }
@@ -42,6 +44,22 @@ public class SoundWebSocketMessage {
         this.soundImageUrl = soundImageUrl;
         this.status = status;
         this.currentMillisecond = currentMillisecond;
+        this.startAtEpochMillis = System.currentTimeMillis() + 500; // Add 500ms buffer for network latency
+        this.updatedAt = new Date();
+        this.lyrics = lyrics;
+    }
+    
+    public SoundWebSocketMessage(Long matchId, Long soundId, String title, String soundUrl, 
+                                String soundImageUrl, SoundStatus status, Long currentMillisecond,
+                                List<LyricsDto> lyrics, Long startAtEpochMillis) {
+        this.matchId = matchId;
+        this.soundId = soundId;
+        this.title = title;
+        this.soundUrl = soundUrl;
+        this.soundImageUrl = soundImageUrl;
+        this.status = status;
+        this.currentMillisecond = currentMillisecond;
+        this.startAtEpochMillis = startAtEpochMillis;
         this.updatedAt = new Date();
         this.lyrics = lyrics;
     }
@@ -101,6 +119,14 @@ public class SoundWebSocketMessage {
 
     public void setCurrentMillisecond(Long currentMillisecond) {
         this.currentMillisecond = currentMillisecond;
+    }
+    
+    public Long getStartAtEpochMillis() {
+        return startAtEpochMillis;
+    }
+
+    public void setStartAtEpochMillis(Long startAtEpochMillis) {
+        this.startAtEpochMillis = startAtEpochMillis;
     }
 
     public Date getUpdatedAt() {

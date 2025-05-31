@@ -5,6 +5,7 @@ import com.project.fanla.event.LyricsEvent;
 import com.project.fanla.model.dto.LyricsDto;
 import com.project.fanla.model.entity.Lyrics;
 import com.project.fanla.model.entity.Match;
+import com.project.fanla.model.enums.SoundStatus;
 import com.project.fanla.model.websocket.SoundWebSocketMessage;
 import com.project.fanla.repository.LyricsRepository;
 import com.project.fanla.repository.MatchRepository;
@@ -209,6 +210,9 @@ public class MatchWebSocketHandler extends TextWebSocketHandler {
             }
         }
         
+        // Calculate startAtEpochMillis based on sound status
+        Long startAtEpochMillis = calculateStartAtEpochMillis(state.getSoundStatus());
+        
         return new SoundWebSocketMessage(
             matchId,
             state.getActiveSoundId(),
@@ -217,8 +221,36 @@ public class MatchWebSocketHandler extends TextWebSocketHandler {
             state.getActiveSoundImageUrl(),
             state.getSoundStatus(),
             state.getCurrentMillisecond(),
-            lyricsList
+            lyricsList,
+            startAtEpochMillis
         );
+    }
+    
+    /**
+     * Ses durumuna göre startAtEpochMillis değerini hesaplar
+     * 
+     * @param status Ses durumu
+     * @return Hesaplanan startAtEpochMillis değeri
+     */
+    private Long calculateStartAtEpochMillis(SoundStatus status) {
+        // Şu anki zaman
+        long currentTimeMillis = System.currentTimeMillis();
+        
+        // Ses durumuna göre farklı değerler hesapla
+        switch (status) {
+            case STARTED:
+                // Başlatma durumunda 500ms buffer ekle
+                return currentTimeMillis + 500L;
+                
+            case PAUSED:
+            case STOPPED:
+                // Durdurma veya duraklatma durumunda gecikme yok
+                return currentTimeMillis;
+                
+            default:
+                // Varsayılan olarak 500ms buffer ekle
+                return currentTimeMillis + 500L;
+        }
     }
     
     /**
